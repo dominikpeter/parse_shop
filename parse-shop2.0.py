@@ -5,7 +5,6 @@ import urllib.request
 import pandas as pd
 import numpy as np
 import re
-import progressbar
 from itertools import chain
 from multiprocessing import Pool
 import functools
@@ -14,6 +13,7 @@ import requests
 from collections import defaultdict
 import json
 import argparse
+from requests import ConnectionError
 
 
 def get_session(shop):
@@ -76,8 +76,8 @@ def loop_article_href(session):
 
             if round(percent,1) in range(10, 110, 10):
                 print("Parsing: %s of %s (%s)" % (str(indexes[1]), str(indexes[2]), str(round(percent,1))))
-        except:
-            print("Error..continue")
+        except (ConnectionError, Exception) as e:
+            print(e)
             continue
 
     links = list(links)
@@ -111,15 +111,18 @@ def parse_article(session, idArticle):
     container = {}
     for article in idArticle.values():
         for i in article:
-            s = requests.Session()
-            r = s.get(session + "&f=art&art=" + str(i))
+            try:
+                s = requests.Session()
+                r = s.get(session + "&f=art&art=" + str(i))
 
-            soup = bs.BeautifulSoup(r.text, 'lxml', parse_only=bs.SoupStrainer('div', {"id": "artDetailMain"}))
-            text = [re.sub("\n", "", i.text) for i in soup.find_all("div", {'id': 'artDetailDescRow'})]
-            idsupplier = [re.sub("\n", "", i.text) for i in soup.find_all("div", {'id': 'artDetailLiefArnumRow'})]
-            price = [re.findall("\d+\.\d+", i.text)[0] for i in soup.find_all("div", {'id': 'artDetailLiefPriceRow'})]
+                soup = bs.BeautifulSoup(r.text, 'lxml', parse_only=bs.SoupStrainer('div', {"id": "artDetailMain"}))
+                text = [re.sub("\n", "", i.text) for i in soup.find_all("div", {'id': 'artDetailDescRow'})]
+                idsupplier = [re.sub("\n", "", i.text) for i in soup.find_all("div", {'id': 'artDetailLiefArnumRow'})]
+                price = [re.findall("\d+\.\d+", i.text)[0] for i in soup.find_all("div", {'id': 'artDetailLiefPriceRow'})]
 
-            container[str(i)] = [text, idsupplier, price]
+                container[str(i)] = [text, idsupplier, price]
+            except:
+                continue    
     return container
 
 if __name__ == "__main__":
@@ -147,7 +150,7 @@ if __name__ == "__main__":
     if args.refresh:
         print("Parse Article ID's")
         article_hrefs = get_all_article_links(cats)
-        output_json_file(article_refs, args.outputId)
+        output_json_file(article_hrefs, args.outputId)
 
 
     data = read_json_file(args.outputId)
