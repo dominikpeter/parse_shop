@@ -122,7 +122,7 @@ def parse_article(session, idArticle):
 
                 container[str(i)] = [text, idsupplier, price]
             except:
-                continue    
+                continue
     return container
 
 if __name__ == "__main__":
