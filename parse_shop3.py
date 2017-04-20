@@ -28,7 +28,7 @@ def read_json_file(filename):
 
 class shop_parser:
     def __init__(self, shop):
-
+        # get shop url
         source = urllib.request.urlopen("http://www.dfshop.com/TeamShop/")
         soup = bs.BeautifulSoup(source, 'lxml', parse_only=bs.SoupStrainer('td'))
         g = [i[0]+1 for i in enumerate(soup) if re.match(".+"+str(shop)+".+", str(i[1]))]
@@ -47,7 +47,7 @@ class shop_parser:
         s = requests.Session()
         r = s.get(self.session)
 
-        self.all_article_id = {} #all article id's
+        self.article_id = {} #all article id's
         self.categorys = []
         #self.article_hrefs = []
         self.data = {}
@@ -106,25 +106,32 @@ class shop_parser:
         for c in self.categorys:
             self.session = c
             cat_string = str(re.findall(r'(cat=\d+\.\d+\.\d+\.\d+)', c)[0])
+            print("",end="\r")
             print("Parsing: %s" % (re.sub("=", " = ", cat_string)), flush=True)
-            self.all_article_id[cat_string] = self.loop_article_href()
+            self.article_id[cat_string] = self.loop_article_href()
 
     def parse_article(self):
-        for article in self.all_article_id.values():
-            for i in tqmd(article):
-                try:
-                    s = requests.Session()
-                    r = s.get(self.session + "&f=art&art=" + str(i))
+        for article in self.article_id.values():
+            try:
+                for i in tqdm(article):
+                    try:
+                        s = requests.Session()
+                        r = s.get(re.sub("&f=listpage&nav=next","&f=cat&cat=", self.session) + str(i))
 
-                    soup = bs.BeautifulSoup(r.text, 'lxml', parse_only=bs.SoupStrainer('div', {"id": "artDetailMain"}))
-                    text = [re.sub("\n", "", i.text) for i in soup.find_all("div", {'id': 'artDetailDescRow'})]
-                    idsupplier = [re.sub("\n", "", i.text) for i in soup.find_all("div", {'id': 'artDetailLiefArnumRow'})]
-                    price = [re.findall("\d+\.\d+", i.text)[0] for i in soup.find_all("div", {'id': 'artDetailLiefPriceRow'})]
+                        soup = bs.BeautifulSoup(r.text, 'lxml', parse_only=bs.SoupStrainer('div', {"id": "artDetailMain"}))
+                        text = [re.sub("\n", "", art.text) for art in soup.find_all("div", {'id': 'artDetailDescRow'})]
+                        idsupplier = [re.sub("\n", "", sup.text) for sup in soup.find_all("div", {'id': 'artDetailLiefArnumRow'})]
+                        price = [re.findall("\d+\.\d+", p.text)[0] for p in soup.find_all("div", {'id': 'artDetailLiefPriceRow'})]
 
-                    self.data[str(i)] = [text, idsupplier, price]
-                except (ConnectionError, Exception) as e:
-                    print(e)
-                    continue
+                        self.data[str(i)] = [text, idsupplier, price]
+                    except (ConnectionError) as e:
+                        print(e)
+                        time.sleep(1)
+                        continue
+            except (ConnectionError) as e:
+                print(e)
+                time.sleep(1)
+                continue
 
 
 if __name__ == "__main__":
